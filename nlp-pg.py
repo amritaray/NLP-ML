@@ -19,10 +19,10 @@ from nltk.tag import pos_tag
 #        import sys
 #        Pdb(color_scheme='Linux').set_trace(sys._getframe().f_back)
 
-text = open('fitness_pre-processed_TEXT(2820).txt', 'r')
+text = open('text-description.txt', 'r')
 textread = text.readlines()
 
-label = open('fitness_Label_DATA_nlp.txt', 'r')
+label = open('labels.txt', 'r')
 labelread = label.readlines()
 
 # random 75% of the data in training set
