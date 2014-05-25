@@ -1,0 +1,125 @@
+Modeling of the fitness app labels vs the features from the app descriptions
+========================================================
+Author: Amrita Ray
+
+(A) Input for this code:
+Training id file = trainid.csv
+Test id file = testid.csv
+Text vs feature vector matrix = allwords.csv
+
+These three files were outputs of the python code nlp-pg.py
+
+Label data = fitness_Label_DATA_nlp.txt
+
+(B) Output: model.html that gives the description of each method used, results from Naive Bayes and plots from Lasso regression.
+
+===
+Modeling Methods 1) and 2)
+===
+
+1) Simple classification method based on Bayes rule with two assumptions that position of a word doesn't matter and probability of each word occuring given the class (fitness app or not) is independent. Even with the assumptions, Naive Bayes is known to be effective for large number of predictors for example in natural language processing data.
+
+The data matrix is in the format 'y' and 'n' according to word matching with feature vector (dictionary key); and label is the dependent variable.
+
+This code prints the confusion matrix (2x2 matrix of true and predicted class), precision (fraction of texts assigned to 'fitness app' class that are actually about fitness), recall (fraction of texts about fitness are classified correctly) and F-measure (weighted harmonic mean of precision and recall).
+
+```{r packagecheck, warning=FALSE, message=FALSE}
+if (!require("e1071")) {
+  install.packages("e1071", repos="http://cran.rstudio.com/") 
+  library("e1071")
+}
+if (!require("glmnet")) {
+  install.packages("glmnet", repos="http://cran.rstudio.com/") 
+  library("glmnet")
+}
+```
+
+```{r datamatrix}
+trainid = read.csv("trainid.csv", header =FALSE)
+
+testid = read.csv("testid.csv", header = FALSE)
+
+all = read.csv("allwords.csv",header = FALSE)
+
+label = read.table("fitness_Label_DATA_nlp.txt", header = FALSE)
+
+yesnofn = function(input){
+if(input == 0){return("n")}
+if(input > 0){return("y")}
+}
+
+allyesno = apply(all[,c(1:ncol(all))], 1:2, FUN = yesnofn)
+
+group = vector("numeric", length = nrow(allyesno))
+
+group[unlist(trainid[1,] + 1)] = 1  # group 1 is training
+group[unlist(testid[1,] + 1)] = 2   # group 2 is test
+
+pgdata = cbind(allyesno, label, group)
+colnames(pgdata)[ncol(pgdata)-1] = "label"
+
+traindata = subset(pgdata, pgdata$group == 1)
+testdata = subset(pgdata, pgdata$group == 2)
+```
+
+Naive Bayes to create the classification model
+```{r naivebayes, message = FALSE, warning=FALSE}
+Sys.time()
+
+model = naiveBayes(as.factor(label) ~ ., data = traindata[,c(1:(ncol(traindata)-1))])
+pred = predict(model, testdata[,c(1:(ncol(testdata)-2))])
+confusion = table(pred, as.factor(testdata$label))
+confusion
+precision = confusion[2,2]/(confusion[2,2] + confusion[2,1])
+recall = confusion[2,2]/(confusion[2,2] + confusion[1,2])
+Fmeasure = 2*precision*recall/(precision + recall)
+resultNB = data.frame(precision = precision, recall = recall, Fmeasure = Fmeasure)
+
+# Precision, Recall and F-measure from Naive Bayes:
+resultNB
+Sys.time()
+```
+
+2) Due the sparse nature of the data (only few words in each text match with the dictionary, i.e. only few features will be present in each text) I have also used Lasso penalized regression to model the label on the feature vector. Lasso is a regularization method and with properly chosen tuning parameter (penalty) it lowers the coefficients of several variables to zero, so allows to select the fewer features that are the best predictors of the response vector.
+
+Here the matrix is 1/0 with 1 when feature is present in the text, 0 otherwise; and as before label is the dependent variable.
+
+I have used 10 fold cross validation within training data to assess the training error. This code also plots the mean squared training error and root mean squared test error after prediction. 
+```{r lasso}
+onezerofn = function(input){
+if(input == 0){return(0)}
+if(input > 0){return(1)}
+}
+allonezero = apply(all[,c(1:ncol(all))], 1:2, FUN = onezerofn)
+
+pgdata = cbind(allonezero, label, group)
+colnames(pgdata)[ncol(pgdata)-1] = "label"
+
+traindata = subset(pgdata, pgdata$group == 1)
+testdata = subset(pgdata, pgdata$group == 2)
+x=model.matrix(label~., data = traindata[,c(1:(ncol(traindata)-1))])
+y = traindata[,c(1:(ncol(traindata)-1))]$label
+
+Sys.time()
+
+fit.lasso=glmnet(x,y, family = "binomial")
+#plot(fit.lasso,xvar="lambda",label=TRUE)
+cv.lasso=cv.glmnet(x,y, family = "binomial")
+plot(cv.lasso)
+cf = coef(cv.lasso)
+length(which(cf > 0))  ## Number of non zero features
+
+testdata = subset(pgdata, pgdata$group == 2)
+xtest=model.matrix(label~., data = testdata[,c(1:(ncol(testdata)-1))])
+
+ytest = testdata[,c(1:(ncol(testdata)-1))]$label
+
+pred=predict(fit.lasso, xtest, type = "response")
+rmse= sqrt(apply((ytest -pred)^2,2,mean))
+plot(log(fit.lasso$lambda),rmse,type="b",xlab="Log(lambda)", ylab = "RMSE in test")
+lam.best=fit.lasso$lambda[order(rmse)[1]]
+# tuning parameter, the penalty in lasso model
+lam.best
+
+Sys.time()
+```
