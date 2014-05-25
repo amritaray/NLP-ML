@@ -9,7 +9,7 @@ Text vs feature vector matrix = allwords.csv
 
 These three files were outputs of the python code nlp-pg.py
 
-Label data = fitness_Label_DATA_nlp.txt
+Label data = labels.txt
 
 (B) Output: model.html that gives the description of each method used, results from Naive Bayes and plots from Lasso regression.
 
@@ -41,7 +41,7 @@ testid = read.csv("testid.csv", header = FALSE)
 
 all = read.csv("allwords.csv",header = FALSE)
 
-label = read.table("fitness_Label_DATA_nlp.txt", header = FALSE)
+label = read.table("labels.txt", header = FALSE)
 
 yesnofn = function(input){
 if(input == 0){return("n")}
